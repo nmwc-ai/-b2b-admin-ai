@@ -10,10 +10,11 @@ Supabase Postgres + Claude API**로 처음부터 재구축한 것.
 
 - **Vercel** (Hobby) — FastAPI 서버리스 (`api/index.py` → `app.main:app`)
 - **Supabase Postgres** — 단일 DB. 서버리스는 **transaction pooler(:6543)** 연결 사용
-- **Claude Opus 4.8** (`anthropic` SDK) — 문의 파싱 + 회신 초안 생성
-- **Gmail IMAP** — 수신 + 임시보관함 초안 저장 (발송 안 함)
+- **Claude Opus 4.8** (`anthropic` SDK) — 회신 초안 생성
+- **Notion 동기화** — 자동수신. 홈페이지 폼 → Notion DB(자동) → 신규 행을 딜로 적재 (`notion_sync.py`)
+- **Gmail IMAP** — 회신 초안을 Gmail 임시보관함에 저장 (발송은 사람이)
 - FastAPI + Jinja2 + HTMX — 어드민 UI
-- **Vercel Cron** — 매일 1회 인박스 폴링 (`/cron/daily`)
+- **Vercel Cron** — 매일 1회 Notion 신규 문의 동기화 (`/cron/daily`)
 
 ## 구조
 
@@ -23,8 +24,9 @@ app/
   main.py             라우트 + Basic Auth 미들웨어
   db.py               Postgres 데이터 레이어 (init_db는 런타임 미호출)
   ai.py               Claude (parse_email, generate_reply_draft)
-  email_client.py     Gmail IMAP (fetch_new_emails, create_draft)
-  inbox.py            poll_inbox (수신→파싱→회신생성→딜)
+  notion_sync.py      Notion 증분 동기화 (신규 문의→딜, 자동수신)
+  email_client.py     Gmail IMAP (회신 초안 저장)
+  inbox.py            (레거시) Gmail poll_inbox — 현재 미사용
   examples.py         few-shot 사례 CRUD (Postgres)
   settings.py         회사/디렉터 설정 (DB→env 폴백)
   error_log.py        logger.error → errors 테이블
@@ -63,7 +65,7 @@ cp .env.example .env        # 값 채우기 (아래)
 | `CRON_SECRET` | Vercel Cron 보호. `/cron/daily`는 `Authorization: Bearer <CRON_SECRET>` 검증 |
 | `APP_BASE_URL` | 공개 주소 |
 | `ANTIEGG_*` / `DIRECTOR_*` | 회사/디렉터 정보 (settings 폴백) |
-| `NOTION_TOKEN` / `NOTION_DB_ID` | 노션 임포트용 (scripts 전용) |
+| `NOTION_TOKEN` / `NOTION_DB_ID` | 노션 동기화(런타임 자동수신) + 임포트 스크립트. **Vercel env 필수** |
 
 > Supabase 연결: 서버리스는 직접연결(:5432, 현재 IPv6 전용)이 아닌 **pooler(:6543)** 를 써야 한다.
 > Supabase 대시보드 → Project Settings → Database → Connection string → **Transaction pooler**.
@@ -81,12 +83,12 @@ vercel --prod
 > **자동 배포**: GitHub 레포(`ruruzene-del/antiegg-b2b-cloud`)가 Vercel에 연결돼 있어
 > `git push origin main` 하면 프로덕션이 자동 배포된다 (`vercel git connect` 완료).
 
-`vercel.json`의 cron이 매일 00:00(UTC)에 `/cron/daily`를 호출해 인박스를 폴링한다.
+`vercel.json`의 cron이 매일 00:00(UTC, 09:00 KST)에 `/cron/daily`를 호출해 Notion 신규 문의를 동기화한다.
 Vercel은 cron 요청에 `Authorization: Bearer $CRON_SECRET` 헤더를 붙인다.
 
 ## 운영 흐름
 
-1. 새 B2B 메일 → (일1회 cron 또는 세팅의 "지금 인박스 확인") → Claude 파싱 + 회신 초안 자동 생성 → 인박스에 딜 추가
+1. 홈페이지 폼 문의 → Notion DB에 자동 적재 → (일1회 cron 또는 세팅 "지금 동기화") → 신규 행을 딜로 + Claude 회신 초안 자동 생성 → 인박스에 추가
 2. 인박스에서 딜 열기 → 회신 초안 검토/수정 (필요시 "AI 재생성") → **"Gmail 초안으로 저장"**
 3. Gmail 임시보관함에서 사람이 확인 후 직접 발송 → 어드민에서 Stage 수동 변경
 
