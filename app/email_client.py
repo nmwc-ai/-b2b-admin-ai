@@ -203,6 +203,22 @@ def fetch_sent_emails(limit: int = 30, since_uid: str = None) -> list:
     return results
 
 
+def send_mail(to: str, subject: str, body: str) -> None:
+    """SMTP 평문 메일 발송 (에러 알림용)."""
+    addr, pwd, _ = _creds()
+    if not addr or not pwd:
+        raise RuntimeError('GMAIL 자격증명 미설정')
+    msg = MIMEMultipart()
+    msg['From'] = addr
+    msg['To'] = to
+    msg['Subject'] = subject
+    msg['Date'] = eutils.formatdate(localtime=True)
+    msg.attach(MIMEText(body, 'plain', 'utf-8'))
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        server.login(addr, pwd)
+        server.send_message(msg)
+
+
 def send_with_attachment(to: str, subject: str, body: str, filename: str, data: bytes,
                          mime_subtype: str = 'json') -> None:
     """SMTP로 첨부파일 메일 발송 (백업 스냅샷 전송용)."""

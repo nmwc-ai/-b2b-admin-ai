@@ -84,6 +84,23 @@
   </div>
 </div>
 
+<div class="settings-group">
+  <div class="card">
+    <div class="h-section mb-4">에러 알림</div>
+    <div class="text-meta mb-4">
+      매일 동기화·백업이 실패하거나 24시간 내 에러가 있으면 운영자 Gmail로 알림 메일을 보냅니다(정상이면 안 보냄).
+      알림이 제대로 도착하는지 아래로 테스트하세요.
+    </div>
+    <div style="display: flex; justify-content: flex-end;">
+      <button type="button" class="btn btn-secondary"
+              hx-post="/admin/test-alert" hx-swap="none">
+        <i data-lucide="bell" style="width:14px; height:14px;"></i>
+        <span>알림 테스트</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 {% if saved %}
 <script>
   (function() {

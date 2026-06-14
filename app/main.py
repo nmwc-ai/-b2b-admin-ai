@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
-from app import db, ai, settings, inbox, email_client, notion_sync, backup
+from app import db, ai, settings, inbox, email_client, notion_sync, backup, alerts
 from app import examples as ex_svc
 from app.error_log import install_db_handler
 
@@ -707,7 +707,13 @@ async def cron_daily(request: Request):
     except Exception as e:
         bk = {'error': str(e)}
         logging.error(f'[cron/daily] backup 실패: {e}')
-    return JSONResponse({'ok': True, 'sync': result, 'backup': bk})
+    # 문제 있으면 알림 메일 (정상이면 침묵)
+    try:
+        al = alerts.check_and_alert({'sync': result, 'backup': bk})
+    except Exception as e:
+        al = {'error': str(e)}
+        logging.error(f'[cron/daily] alert 실패: {e}')
+    return JSONResponse({'ok': True, 'sync': result, 'backup': bk, 'alert': al})
 
 
 @app.post('/admin/sync-notion')
@@ -725,6 +731,19 @@ async def admin_sync_notion(request: Request):
         resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': typ}})
         return resp
     return JSONResponse({'ok': True, **result})
+
+
+@app.post('/admin/test-alert')
+async def admin_test_alert(request: Request):
+    """'알림 테스트' 버튼 — 알림 메일이 실제로 도착하는지 확인."""
+    ok = alerts.notify('알림 테스트', '이 메일이 보이면 에러 알림이 정상 작동합니다.\n'
+                       '실제 알림은 동기화·백업 실패나 24시간 내 에러 발생 시에만 전송됩니다.')
+    msg = '테스트 알림 발송됨 — 받은편지함 확인' if ok else '알림 발송 실패 (수신 이메일 확인)'
+    if request.headers.get('HX-Request'):
+        resp = HTMLResponse('', status_code=200)
+        resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': 'success' if ok else 'error'}})
+        return resp
+    return JSONResponse({'ok': ok, 'message': msg})
 
 
 @app.post('/admin/backup')
