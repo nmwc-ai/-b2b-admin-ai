@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
-from app import db, ai, settings, inbox, email_client
+from app import db, ai, settings, inbox, email_client, notion_sync
 from app import examples as ex_svc
 from app.error_log import install_db_handler
 
@@ -692,24 +692,39 @@ async def preview_contract(request: Request, deal_id: str):
 # ── 인박스 폴링 (cron + 수동) ─────────────────────────────────────────────────
 @app.get('/cron/daily')
 async def cron_daily(request: Request):
-    """Vercel Cron 일1회. Authorization: Bearer <CRON_SECRET> 검증."""
+    """Vercel Cron 일1회 — Notion 신규 문의 동기화. Authorization: Bearer <CRON_SECRET>."""
     secret = os.getenv('CRON_SECRET', '')
     if secret:
         auth = request.headers.get('Authorization', '')
         if auth != f'Bearer {secret}':
             return JSONResponse({'error': 'unauthorized'}, status_code=401)
-    result = inbox.poll_inbox()
-    logging.info(f'[cron/daily] {result}')
+    result = notion_sync.sync_new()
+    logging.info(f'[cron/daily] notion_sync {result}')
+    return JSONResponse({'ok': True, **result})
+
+
+@app.post('/admin/sync-notion')
+async def admin_sync_notion(request: Request):
+    """'지금 동기화' 버튼 — Notion 신규 문의를 딜로 적재."""
+    result = notion_sync.sync_new()
+    if result.get('error'):
+        msg = f"동기화 실패: {result['error']}"
+        typ = 'error'
+    else:
+        msg = f"신규 {result.get('new', 0)}건 중 {result.get('inserted', 0)}건 적재"
+        typ = 'success' if result.get('inserted') else 'info'
+    if request.headers.get('HX-Request'):
+        resp = HTMLResponse('', status_code=200)
+        resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': typ}})
+        return resp
     return JSONResponse({'ok': True, **result})
 
 
 @app.post('/admin/poll-inbox')
 async def admin_poll_inbox(request: Request):
-    """'지금 인박스 확인' 버튼 — 동기 폴링."""
+    """(레거시) Gmail 폴링. 실제 문의는 Notion으로 들어와 사용 안 함."""
     result = inbox.poll_inbox()
     msg = f"수신 {result['fetched']}건 · 새 딜 {result['created']}건"
-    if result.get('errors'):
-        msg += f" · 오류 {result['errors']}건"
     if request.headers.get('HX-Request'):
         resp = HTMLResponse('', status_code=200)
         resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': 'info'}})

@@ -52,16 +52,16 @@
 
 <div class="settings-group" style="margin-top: var(--sp-8);">
   <div class="card">
-    <div class="h-section mb-4">인박스 수신</div>
+    <div class="h-section mb-4">문의 동기화 (Notion)</div>
     <div class="text-meta mb-4">
-      매일 1회 자동으로 Gmail의 새 B2B 문의를 받아 회신 초안을 만듭니다(Vercel Cron).
-      지금 바로 확인하려면 아래 버튼을 누르세요. 새 메일이 있으면 인박스에 딜로 추가됩니다.
+      홈페이지 문의 폼 → Notion으로 들어온 신규 문의를 매일 1회 자동으로 딜로 가져옵니다(Vercel Cron).
+      지금 바로 가져오려면 아래 버튼을 누르세요. 기존 딜은 그대로 두고 신규 건만 추가되며, AI 회신 초안도 함께 생성됩니다.
     </div>
     <div style="display: flex; justify-content: flex-end;">
       <button type="button" class="btn btn-primary"
-              hx-post="/admin/poll-inbox" hx-swap="none">
+              hx-post="/admin/sync-notion" hx-swap="none">
         <i data-lucide="refresh-cw" style="width:14px; height:14px;"></i>
-        <span>지금 인박스 확인</span>
+        <span>지금 동기화</span>
       </button>
     </div>
   </div>
