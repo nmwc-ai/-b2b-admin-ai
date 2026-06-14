@@ -67,6 +67,23 @@
   </div>
 </div>
 
+<div class="settings-group">
+  <div class="card">
+    <div class="h-section mb-4">백업</div>
+    <div class="text-meta mb-4">
+      매일 1회 DB 전체를 JSON 스냅샷으로 떠서 운영자 Gmail로 자동 발송합니다(오프사이트 백업).
+      지금 바로 받으려면 아래 버튼을 누르세요. 복구는 <code>scripts/restore_backup.py</code>로 합니다.
+    </div>
+    <div style="display: flex; justify-content: flex-end;">
+      <button type="button" class="btn btn-secondary"
+              hx-post="/admin/backup" hx-swap="none">
+        <i data-lucide="download" style="width:14px; height:14px;"></i>
+        <span>지금 백업</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 {% if saved %}
 <script>
   (function() {

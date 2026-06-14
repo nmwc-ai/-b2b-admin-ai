@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
-from app import db, ai, settings, inbox, email_client, notion_sync
+from app import db, ai, settings, inbox, email_client, notion_sync, backup
 from app import examples as ex_svc
 from app.error_log import install_db_handler
 
@@ -700,7 +700,14 @@ async def cron_daily(request: Request):
             return JSONResponse({'error': 'unauthorized'}, status_code=401)
     result = notion_sync.sync_new()
     logging.info(f'[cron/daily] notion_sync {result}')
-    return JSONResponse({'ok': True, **result})
+    # 일1회 DB 백업 (실패해도 동기화 결과는 반환)
+    try:
+        bk = backup.run_backup()
+        logging.info(f'[cron/daily] backup {bk}')
+    except Exception as e:
+        bk = {'error': str(e)}
+        logging.error(f'[cron/daily] backup 실패: {e}')
+    return JSONResponse({'ok': True, 'sync': result, 'backup': bk})
 
 
 @app.post('/admin/sync-notion')
@@ -718,6 +725,22 @@ async def admin_sync_notion(request: Request):
         resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': typ}})
         return resp
     return JSONResponse({'ok': True, **result})
+
+
+@app.post('/admin/backup')
+async def admin_backup(request: Request):
+    """'지금 백업' 버튼 — DB 스냅샷을 Gmail로 발송."""
+    result = backup.run_backup()
+    if result.get('error'):
+        msg, typ = f"백업 실패: {result['error']}", 'error'
+    else:
+        msg = f"백업 완료 — {result['total']}행({result['size_kb']}KB) → {result['to']}"
+        typ = 'success'
+    if request.headers.get('HX-Request'):
+        resp = HTMLResponse('', status_code=200)
+        resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': typ}})
+        return resp
+    return JSONResponse(result)
 
 
 @app.post('/admin/poll-inbox')
