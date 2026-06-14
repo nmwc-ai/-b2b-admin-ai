@@ -78,6 +78,9 @@ vercel link              # 새 프로젝트 생성/연결
 vercel --prod
 ```
 
+> **자동 배포**: GitHub 레포(`ruruzene-del/antiegg-b2b-cloud`)가 Vercel에 연결돼 있어
+> `git push origin main` 하면 프로덕션이 자동 배포된다 (`vercel git connect` 완료).
+
 `vercel.json`의 cron이 매일 00:00(UTC)에 `/cron/daily`를 호출해 인박스를 폴링한다.
 Vercel은 cron 요청에 `Authorization: Bearer $CRON_SECRET` 헤더를 붙인다.
 
