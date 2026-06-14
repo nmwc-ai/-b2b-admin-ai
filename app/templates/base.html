@@ -839,6 +839,10 @@
   </header>
 
   <aside class="sidebar">
+    <a href="/dashboard" class="nav-item {% if request.url.path == '/dashboard' %}active{% endif %}">
+      <i data-lucide="bar-chart-3" class="icon"></i>
+      <span>개요</span>
+    </a>
     <a href="/" class="nav-item {% if request.url.path in ('/', '/inbox') %}active{% endif %}">
       <i data-lucide="inbox" class="icon"></i>
       <span>인박스</span>

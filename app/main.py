@@ -226,6 +226,71 @@ async def inbox_page(request: Request):
     })
 
 
+@app.get('/dashboard', response_class=HTMLResponse)
+async def dashboard_page(request: Request):
+    """내부 팀 공유용 개요 — 영업 현황 한눈에."""
+    import re
+    from collections import Counter
+
+    deals = db.get_all_deals()
+    total = len(deals)
+    won = sum(1 for d in deals if d.get('stage') == 'CLOSED_WON')
+    lost = sum(1 for d in deals if d.get('stage') == 'CLOSED_LOST')
+    active = sum(1 for d in deals if d.get('stage') not in ('CLOSED_WON', 'CLOSED_LOST'))
+    win_rate = round(won / (won + lost) * 100) if (won + lost) else 0
+
+    # 공급가액(원) — 숫자만 추출, 입력된 건만
+    def _won_amount(v):
+        digits = re.sub(r'[^0-9]', '', str(v or ''))
+        return int(digits) if digits else 0
+    priced = [_won_amount(d.get('cond_unit_price')) for d in deals if _won_amount(d.get('cond_unit_price'))]
+    total_value = sum(priced)
+    value_count = len(priced)
+
+    # 월별 문의 추이 — 최근 13개월
+    ym_counts = Counter((d.get('created_at') or '')[:7] for d in deals if (d.get('created_at') or '')[:7])
+    today = datetime.now()
+    months = []
+    y, m = today.year, today.month
+    keys = []
+    for _ in range(13):
+        keys.append(f'{y:04d}-{m:02d}')
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    keys = list(reversed(keys))
+    max_cnt = max((ym_counts.get(k, 0) for k in keys), default=0) or 1
+    for k in keys:
+        c = ym_counts.get(k, 0)
+        months.append({'label': k[2:].replace('-', '.'), 'count': c, 'pct': round(c / max_cnt * 100)})
+
+    # 유형(인바운드/아웃바운드)
+    type_counts = Counter((d.get('inquiry_type') or '(없음)') for d in deals)
+    types = [{'name': n, 'count': c} for n, c in type_counts.most_common()]
+
+    # 상품 상위 (입력된 것만)
+    prod_counts = Counter(
+        (d.get('service_interest') or '').strip()
+        for d in deals if (d.get('service_interest') or '').strip()
+    )
+    top_products = [{'name': n, 'count': c} for n, c in prod_counts.most_common(6)]
+
+    # 파이프라인 단계 분포 (진행중 + 종료)
+    stage_counts = Counter(d.get('stage') or 'REVIEWING' for d in deals)
+    stage_rows = [{'stage': s, 'count': stage_counts.get(s, 0)}
+                  for s in STAGE_OPTIONS if stage_counts.get(s, 0)]
+
+    return templates.TemplateResponse('dashboard.html', {
+        'request': request,
+        'total': total, 'won': won, 'lost': lost, 'active': active, 'win_rate': win_rate,
+        'total_value': f'{total_value:,}', 'value_count': value_count,
+        'months': months,
+        'types': types, 'top_products': top_products, 'stage_rows': stage_rows,
+        'generated_at': today.strftime('%Y-%m-%d %H:%M'),
+    })
+
+
 @app.get('/pipeline', response_class=HTMLResponse)
 async def pipeline_page(request: Request, show_closed: bool = False):
     all_deals = db.get_all_deals()

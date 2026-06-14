@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}개요 — ANTIEGG B2B{% endblock %}
+
+{% block head_extra %}
+<style>
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-4);
+    margin-bottom: var(--sp-6);
+  }
+  .kpi {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: var(--sp-5);
+  }
+  .kpi .label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  .kpi .value {
+    font-size: 28px; font-weight: 700; color: var(--text-primary);
+    letter-spacing: -.02em; margin-top: var(--sp-1); font-variant-numeric: tabular-nums;
+  }
+  .kpi .sub { font-size: 12px; color: var(--text-secondary); margin-top: var(--sp-1); }
+  .kpi .value .unit { font-size: 15px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+
+  .dash-cols { display: grid; grid-template-columns: 2fr 1fr; gap: var(--sp-4); }
+  .panel-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: var(--sp-5); margin-bottom: var(--sp-4);
+  }
+  .panel-card .h-section { margin-bottom: var(--sp-4); }
+
+  /* 월별 막대 차트 */
+  .bar-chart { display: flex; align-items: flex-end; gap: var(--sp-2); height: 160px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); height: 100%; justify-content: flex-end; }
+  .bar-col .bar {
+    width: 100%; max-width: 28px; min-height: 2px;
+    background: var(--primary); border-radius: 3px 3px 0 0;
+    transition: opacity var(--d-fast);
+  }
+  .bar-col:hover .bar { opacity: .8; }
+  .bar-col .cnt { font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .bar-col .mon { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+
+  /* 가로 분포 바 */
+  .dist-row { margin-bottom: var(--sp-3); }
+  .dist-row:last-child { margin-bottom: 0; }
+  .dist-head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: var(--sp-1); }
+  .dist-head .n { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dist-head .c { color: var(--text-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: var(--sp-2); }
+  .dist-track { height: 6px; background: #F3F4F6; border-radius: 3px; overflow: hidden; }
+  .dist-fill { height: 100%; background: var(--primary); border-radius: 3px; }
+  .dist-fill.win { background: #16A34A; }
+  .dist-fill.lost { background: var(--text-disabled); }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .dash-cols { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="h-page">개요</h1>
+    <div class="text-meta mt-2">ANTIEGG B2B 영업 현황 · {{ generated_at }} 기준</div>
+  </div>
+</div>
+
+{# ── KPI ── #}
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">전체 딜</div>
+    <div class="value">{{ total }}<span class="unit">건</span></div>
+    <div class="sub">진행중 {{ active }}건</div>
+  </div>
+  <div class="kpi">
+    <div class="label">성사율</div>
+    <div class="value">{{ win_rate }}<span class="unit">%</span></div>
+    <div class="sub">성사 {{ won }} · 실패 {{ lost }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">성사 딜</div>
+    <div class="value">{{ won }}<span class="unit">건</span></div>
+    <div class="sub">실패·종료 {{ lost }}건</div>
+  </div>
+  <div class="kpi">
+    <div class="label">계약액 합계</div>
+    <div class="value" style="font-size:22px;">₩{{ total_value }}</div>
+    <div class="sub">공급가액 기재 {{ value_count }}건 기준</div>
+  </div>
+</div>
+
+<div class="dash-cols">
+  {# ── 월별 문의 추이 ── #}
+  <div>
+    <div class="panel-card">
+      <div class="h-section">월별 문의 추이 <span class="text-muted" style="font-weight:400;">(최근 13개월)</span></div>
+      <div class="bar-chart">
+        {% for m in months %}
+        <div class="bar-col" title="{{ m.label }} · {{ m.count }}건">
+          <span class="cnt">{{ m.count }}</span>
+          <div class="bar" style="height: {{ m.pct }}%;"></div>
+          <span class="mon">{{ m.label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# ── 파이프라인 단계 분포 ── #}
+    <div class="panel-card">
+      <div class="h-section">단계별 분포</div>
+      {% for r in stage_rows %}
+      <div class="dist-row">
+        <div class="dist-head">
+          <span class="n">{{ r.stage }}</span>
+          <span class="c">{{ r.count }}</span>
+        </div>
+        <div class="dist-track">
+          <div class="dist-fill {% if r.stage == 'CLOSED_WON' %}win{% elif r.stage == 'CLOSED_LOST' %}lost{% endif %}"
+               style="width: {{ (r.count / total * 100) if total else 0 }}%;"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ── 우측: 유형 + 상품 ── #}
+  <div>
+    <div class="panel-card">
+      <div class="h-section">문의 유형</div>
+      {% for t in types %}
+      <div class="dist-row">
+        <div class="dist-head">
+          <span class="n">{{ t.name }}</span>
+          <span class="c">{{ t.count }}</span>
+        </div>
+        <div class="dist-track">
+          <div class="dist-fill" style="width: {{ (t.count / total * 100) if total else 0 }}%;"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="panel-card">
+      <div class="h-section">상품 상위 <span class="text-muted" style="font-weight:400;">(기재된 건)</span></div>
+      {% if top_products %}
+        {% for p in top_products %}
+        <div class="dist-row">
+          <div class="dist-head">
+            <span class="n" title="{{ p.name }}">{{ p.name }}</span>
+            <span class="c">{{ p.count }}</span>
+          </div>
+          <div class="dist-track">
+            <div class="dist-fill" style="width: {{ (p.count / top_products[0].count * 100) if top_products else 0 }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-meta">상품 정보가 기재된 딜이 없습니다.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
