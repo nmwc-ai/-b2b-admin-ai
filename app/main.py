@@ -129,7 +129,9 @@ def _classify_inbox_now(deal: dict) -> dict:
         return {'dot': 'critical', 'label': '회신 Gmail 저장 실패 — 재시도 필요'}
     if deal.get('trigger_reply_send') == 'DRAFT':
         return {'dot': 'attention', 'label': '회신 초안 Gmail에 저장됨 — 검토·발송 필요'}
-    if deal.get('stage') == 'REVIEWING' and not (deal.get('reply_draft') or '').strip():
+    if deal.get('stage') == 'REVIEWING':
+        if (deal.get('reply_draft') or '').strip():
+            return {'dot': 'attention', 'label': '회신 초안 작성됨 — 검토 후 Gmail 저장'}
         return {'dot': 'action', 'label': '새 문의 — 회신 초안 만들기'}
     if deal.get('stage') in ('KNOCK_REPLY', 'KNOCK_QUOTE'):
         return {'dot': 'action', 'label': '노크 메일 발송 필요'}

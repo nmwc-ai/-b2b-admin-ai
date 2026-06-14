@@ -268,7 +268,7 @@ def get_inbox_now() -> list:
         cur = _cur(conn)
         cur.execute("""
             SELECT * FROM deals
-            WHERE (stage = 'REVIEWING' AND (reply_draft IS NULL OR reply_draft = ''))
+            WHERE stage = 'REVIEWING'
                OR stage IN ('KNOCK_REPLY', 'KNOCK_QUOTE')
                OR trigger_reply_send    IN ('DRAFT', 'ERROR')
                OR trigger_quote_gen     = 'ERROR'
