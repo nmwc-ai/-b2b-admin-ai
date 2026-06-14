@@ -170,14 +170,40 @@ def _pipeline_marker(deal: dict):
 
 
 # ── Deal 패널 컨텍스트 ────────────────────────────────────────────────────────
+def _extract_docs(deal: dict) -> dict:
+    """노션 임포트가 summary에 보존한 견적서/계약서 URL을 추출.
+    형식: 한 줄당 "견적서: <url>" / "계약서: <url>"."""
+    out = {'quote_url': None, 'contract_url': None}
+    for line in (deal.get('summary') or '').splitlines():
+        s = line.strip()
+        if s.startswith('견적서:'):
+            v = s.split(':', 1)[1].strip()
+            if v.startswith('http'):
+                out['quote_url'] = v
+        elif s.startswith('계약서:'):
+            v = s.split(':', 1)[1].strip()
+            if v.startswith('http'):
+                out['contract_url'] = v
+    return out
+
+
+def _amount_display(deal: dict) -> str:
+    digits = ''.join(c for c in str(deal.get('cond_unit_price') or '') if c.isdigit())
+    return f'₩{int(digits):,}' if digits else ''
+
+
 def _panel_context(deal: dict) -> dict:
     company = deal.get('company') or '(회사명 미상)'
+    docs = _extract_docs(deal)
     return {
         'deal': deal,
         'history': db.get_deals_by_company(company, exclude_deal_id=deal['deal_id']),
         'activities': db.get_activities(deal['deal_id']),
         'has_draft': deal.get('trigger_reply_send') == 'DRAFT',
         'stage_options': STAGE_OPTIONS,
+        'quote_url': docs['quote_url'],
+        'contract_url': docs['contract_url'],
+        'amount_display': _amount_display(deal),
     }
 
 
