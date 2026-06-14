@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Few-shot 사례 — ANTIEGG B2B{% endblock %}
+
+{% block head_extra %}
+<style>
+  .ex-list {
+    display: flex; flex-direction: column; gap: var(--sp-3);
+  }
+  .ex-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: var(--sp-4) var(--sp-5);
+  }
+  .ex-head {
+    display: flex; align-items: baseline; gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+  }
+  .ex-type {
+    display: inline-flex; align-items: center;
+    height: 20px; padding: 0 var(--sp-2);
+    font-size: 11px; font-weight: 600;
+    border-radius: var(--r-sm);
+    background: var(--primary-bg); color: var(--primary);
+  }
+  .ex-source {
+    font-size: 12px; color: var(--text-muted);
+    margin-left: auto;
+    overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; max-width: 280px;
+  }
+  .ex-summary {
+    font-size: 14px; font-weight: 600; color: var(--text-primary);
+    margin-bottom: var(--sp-2);
+  }
+  .ex-meta {
+    font-size: 12px; color: var(--text-muted);
+    margin-bottom: var(--sp-2);
+  }
+  .ex-reply {
+    margin: var(--sp-2) 0;
+  }
+  .ex-reply summary {
+    list-style: none; cursor: pointer; user-select: none;
+    font-size: 12px; color: var(--text-secondary);
+  }
+  .ex-reply summary::-webkit-details-marker { display: none; }
+  .ex-reply summary::before {
+    content: '▶ '; display: inline-block;
+    transition: transform var(--d-fast) var(--ease-smooth);
+    margin-right: 4px;
+  }
+  .ex-reply[open] summary::before { transform: rotate(90deg); }
+  .ex-reply pre {
+    margin-top: var(--sp-2);
+    padding: var(--sp-3);
+    background: #FAFAFA;
+    border-left: 3px solid var(--primary);
+    border-radius: 0 var(--r-md) var(--r-md) 0;
+    font-family: var(--font);
+    font-size: 13px; line-height: 1.7;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .ex-actions {
+    display: flex; justify-content: flex-end; gap: var(--sp-2);
+    margin-top: var(--sp-3);
+    padding-top: var(--sp-2);
+    border-top: 1px solid #F3F4F6;
+  }
+  /* 편집 모드 토글 — 한 카드에 view/edit 두 마크업을 모두 렌더하고 클래스로 스위치 */
+  .ex-card .ex-edit { display: none; }
+  .ex-card.editing .ex-view { display: none; }
+  .ex-card.editing .ex-edit { display: block; }
+  .ex-edit-label {
+    display: block; font-size: 12px; color: var(--text-secondary);
+    margin: var(--sp-2) 0 var(--sp-1) 0;
+  }
+  .ex-edit-area {
+    width: 100%; font-family: var(--font); font-size: 13px;
+    line-height: 1.7; padding: var(--sp-3);
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    background: var(--surface); color: var(--text-primary);
+    resize: vertical;
+  }
+  .ex-edit-area:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+  .ex-edit-actions {
+    display: flex; justify-content: flex-end; gap: var(--sp-2);
+    margin-top: var(--sp-3);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6" style="display:flex; justify-content:space-between; align-items:baseline;">
+  <div>
+    <h1 class="h-page">Few-shot 사례</h1>
+    <div class="text-meta mt-2">{{ items|length }}건 · AI 응답 초안 생성 시 inquiry_type 일치 사례 2개가 우선 사용됩니다</div>
+  </div>
+  <a href="/examples/new" class="btn btn-secondary">
+    <i data-lucide="plus" style="width:14px; height:14px;"></i>
+    <span>사례 추가</span>
+  </a>
+</div>
+
+{% if items %}
+<div class="ex-list">
+  {% for e in items %}
+    {% include '_examples_card.html' %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  사례가 없습니다.<br>
+  <a href="/examples/new">직접 추가</a>하거나 topbar의 <strong>사례 갱신</strong>으로 Gmail SENT에서 자동 수집할 수 있습니다.
+</div>
+{% endif %}
+{% endblock %}

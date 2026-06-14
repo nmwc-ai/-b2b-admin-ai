@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}세팅 — ANTIEGG B2B{% endblock %}
+
+{% block head_extra %}
+<style>
+  .settings-group { margin-bottom: var(--sp-6); }
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-4);
+  }
+  .settings-grid .full { grid-column: 1 / -1; }
+  .form-actions {
+    display: flex; justify-content: flex-end; gap: var(--sp-2);
+    margin-top: var(--sp-5);
+  }
+  @media (max-width: 720px) {
+    .settings-grid { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="h-page">세팅</h1>
+  <div class="text-meta mt-2">견적·계약서 등에 박혀나가는 회사 정보와 디렉터 정보입니다. 저장하면 즉시 반영됩니다.</div>
+</div>
+
+<form method="post" action="/settings">
+  {% for g in groups %}
+  <div class="settings-group">
+    <div class="card">
+      <div class="h-section mb-4">{{ g.label }}</div>
+      <div class="settings-grid">
+        {% for item in g['items'] %}
+        <div class="{% if item.key == 'ANTIEGG_ADDR' %}full{% endif %}">
+          <label for="{{ item.key }}">{{ item.label }}</label>
+          <input type="text" id="{{ item.key }}" name="{{ item.key }}"
+                 value="{{ item.value or '' }}">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="form-actions">
+    <a href="/" class="btn btn-secondary">취소</a>
+    <button type="submit" class="btn btn-primary">저장</button>
+  </div>
+</form>
+
+<div class="settings-group" style="margin-top: var(--sp-8);">
+  <div class="card">
+    <div class="h-section mb-4">인박스 수신</div>
+    <div class="text-meta mb-4">
+      매일 1회 자동으로 Gmail의 새 B2B 문의를 받아 회신 초안을 만듭니다(Vercel Cron).
+      지금 바로 확인하려면 아래 버튼을 누르세요. 새 메일이 있으면 인박스에 딜로 추가됩니다.
+    </div>
+    <div style="display: flex; justify-content: flex-end;">
+      <button type="button" class="btn btn-primary"
+              hx-post="/admin/poll-inbox" hx-swap="none">
+        <i data-lucide="refresh-cw" style="width:14px; height:14px;"></i>
+        <span>지금 인박스 확인</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+{% if saved %}
+<script>
+  (function() {
+    const fire = () => {
+      if (typeof showToast !== 'function') { setTimeout(fire, 50); return; }
+      showToast('세팅이 저장되었습니다', 'success');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('saved');
+      window.history.replaceState({}, '', url.toString());
+    };
+    window.addEventListener('DOMContentLoaded', fire);
+  })();
+</script>
+{% endif %}
+{% endblock %}
