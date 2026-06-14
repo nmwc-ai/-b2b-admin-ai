@@ -637,6 +637,58 @@ async def update_conditions(
     return toast_resp if toast_resp is not None else RedirectResponse(f'/deals/{deal_id}', status_code=303)
 
 
+# ── 견적서 / 계약서 미리보기 (v2) ─────────────────────────────────────────────
+def _doc_amounts(deal: dict) -> dict:
+    """cond_unit_price/quantity → 공급가액·부가세·합계 계산."""
+    def _num(v):
+        d = ''.join(c for c in str(v or '') if c.isdigit())
+        return int(d) if d else 0
+    unit = _num(deal.get('cond_unit_price'))
+    qty = _num(deal.get('cond_quantity')) or 1
+    subtotal = unit * qty
+    vat = int(subtotal * 0.1)
+    return {
+        'unit_price': f'{unit:,}', 'quantity': qty,
+        'subtotal': f'{subtotal:,}', 'vat': f'{vat:,}', 'total': f'{subtotal + vat:,}',
+    }
+
+
+def _company_ctx() -> dict:
+    return {
+        'ceo':    settings.get('ANTIEGG_CEO'),
+        'biz_no': settings.get('ANTIEGG_BIZ_NO'),
+        'phone':  settings.get('ANTIEGG_PHONE'),
+        'email':  settings.get('ANTIEGG_EMAIL'),
+        'addr':   settings.get('ANTIEGG_ADDR'),
+    }
+
+
+@app.get('/preview/quote/{deal_id}', response_class=HTMLResponse)
+async def preview_quote(request: Request, deal_id: str):
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return HTMLResponse('딜을 찾을 수 없습니다', status_code=404)
+    today = datetime.now()
+    return templates.TemplateResponse('quote_preview.html', {
+        'request': request, 'deal': deal,
+        **_doc_amounts(deal), **_company_ctx(),
+        'quote_date': today.strftime('%Y년 %m월 %d일'),
+        'valid_until': (today + timedelta(days=30)).strftime('%Y년 %m월 %d일'),
+    })
+
+
+@app.get('/preview/contract/{deal_id}', response_class=HTMLResponse)
+async def preview_contract(request: Request, deal_id: str):
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return HTMLResponse('딜을 찾을 수 없습니다', status_code=404)
+    return templates.TemplateResponse('contract_preview.html', {
+        'request': request, 'deal': deal,
+        **_doc_amounts(deal), **_company_ctx(),
+        'today': datetime.now().strftime('%Y년 %m월 %d일'),
+    })
+
+
 # ── 인박스 폴링 (cron + 수동) ─────────────────────────────────────────────────
 @app.get('/cron/daily')
 async def cron_daily(request: Request):

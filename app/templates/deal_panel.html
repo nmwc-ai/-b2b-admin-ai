@@ -182,15 +182,51 @@
             <textarea name="cond_notes" style="min-height: 60px;">{{ deal.cond_notes or '' }}</textarea>
           </div>
         </div>
-        <input type="hidden" name="cond_company_addr" value="{{ deal.cond_company_addr or '' }}">
-        <input type="hidden" name="cond_company_ceo" value="{{ deal.cond_company_ceo or '' }}">
-        <input type="hidden" name="cond_company_biz_no" value="{{ deal.cond_company_biz_no or '' }}">
-        <input type="hidden" name="cond_contract_start" value="{{ deal.cond_contract_start or '' }}">
-        <input type="hidden" name="cond_contract_end" value="{{ deal.cond_contract_end or '' }}">
+
+        <div style="margin: var(--sp-4) 0 var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid #F3F4F6;">
+          <div class="micro" style="margin-bottom: var(--sp-2); text-transform: uppercase; letter-spacing: .04em;">계약서 정보</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);">
+            <div>
+              <label>고객사 대표자</label>
+              <input type="text" name="cond_company_ceo" value="{{ deal.cond_company_ceo or '' }}">
+            </div>
+            <div>
+              <label>고객사 사업자번호</label>
+              <input type="text" name="cond_company_biz_no" value="{{ deal.cond_company_biz_no or '' }}">
+            </div>
+            <div>
+              <label>계약 시작일</label>
+              <input type="text" name="cond_contract_start" value="{{ deal.cond_contract_start or '' }}" placeholder="2026-01-01">
+            </div>
+            <div>
+              <label>계약 종료일</label>
+              <input type="text" name="cond_contract_end" value="{{ deal.cond_contract_end or '' }}" placeholder="2026-12-31">
+            </div>
+          </div>
+          <div style="margin-top: var(--sp-3);">
+            <label>고객사 주소</label>
+            <input type="text" name="cond_company_addr" value="{{ deal.cond_company_addr or '' }}">
+          </div>
+        </div>
+
         <div style="margin-top: var(--sp-3);">
           <button type="submit" class="btn btn-secondary">저장</button>
         </div>
       </form>
+
+      {# ── 문서 생성 (조건 기반) ── #}
+      <div style="margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px solid #F3F4F6;">
+        <div class="micro" style="margin-bottom: var(--sp-2); text-transform: uppercase; letter-spacing: .04em;">문서 생성</div>
+        <div class="flex gap-2" style="flex-wrap: wrap;">
+          <a href="/preview/quote/{{ deal.deal_id }}" target="_blank" rel="noopener" class="btn btn-secondary" style="height:32px;">
+            <i data-lucide="file-text" style="width:14px;height:14px;"></i> 견적서 미리보기
+          </a>
+          <a href="/preview/contract/{{ deal.deal_id }}" target="_blank" rel="noopener" class="btn btn-secondary" style="height:32px;">
+            <i data-lucide="file-signature" style="width:14px;height:14px;"></i> 계약서 미리보기
+          </a>
+        </div>
+        <div class="text-meta" style="margin-top: var(--sp-1);">위 조건을 저장한 뒤 미리보기 → 브라우저 ⌘P로 PDF 저장</div>
+      </div>
     </div>
   </details>
 
