@@ -1,99 +1,99 @@
-# ANTIEGG B2B 어드민 — 클라우드 (antiegg-b2b-cloud)
+# ANTIEGG B2B 어드민 (클라우드)
 
-B2B 문의 운영을 1인 디렉터가 처리하도록 돕는 어드민. **판단은 사람, 실행은 AI.**
-메일 발송은 항상 사람이 Gmail 임시보관함에서 확인하고 누른다 — 어드민은 초안만 만든다.
+> B2B 문의 접수 → AI 회신 초안 → 견적·계약 → 딜 관리까지, **1인 디렉터의 영업 운영을 자동화하는 어드민**.
+> 원칙은 _"판단은 사람, 실행은 AI"_ — 메일 발송은 항상 사람이 확인하고 누른다.
 
-기존 로컬 버전(`antiegg-b2b`, llama-server + APScheduler + Tailscale)을 **Vercel 서버리스 +
-Supabase Postgres + Claude API**로 처음부터 재구축한 것.
+🔗 **배포**: https://antiegg-b2b-cloud.vercel.app _(어드민 접근은 내부 인증 필요)_
 
-## 스택
+---
 
-- **Vercel** (Hobby) — FastAPI 서버리스 (`api/index.py` → `app.main:app`)
-- **Supabase Postgres** — 단일 DB. 서버리스는 **transaction pooler(:6543)** 연결 사용
-- **Claude Opus 4.8** (`anthropic` SDK) — 회신 초안 생성
-- **Notion 동기화** — 자동수신. 홈페이지 폼 → Notion DB(자동) → 신규 행을 딜로 적재 (`notion_sync.py`)
-- **Gmail IMAP** — 회신 초안을 Gmail 임시보관함에 저장 (발송은 사람이)
-- FastAPI + Jinja2 + HTMX — 어드민 UI
-- **Vercel Cron** — 매일 1회 Notion 신규 문의 동기화 (`/cron/daily`)
+## 프로젝트 개요
 
-## 구조
+ANTIEGG의 B2B 제휴·도입 문의가 점점 늘면서, 문의 접수부터 회신·견적·계약까지의 운영을
+한 명이 빠르게 처리할 수 있도록 만든 내부 어드민이다.
 
-```
-api/index.py          Vercel 진입점
-app/
-  main.py             라우트 + Basic Auth 미들웨어
-  db.py               Postgres 데이터 레이어 (init_db는 런타임 미호출)
-  ai.py               Claude (parse_email, generate_reply_draft)
-  notion_sync.py      Notion 증분 동기화 (신규 문의→딜, 자동수신)
-  email_client.py     Gmail IMAP (회신 초안 저장)
-  inbox.py            (레거시) Gmail poll_inbox — 현재 미사용
-  examples.py         few-shot 사례 CRUD (Postgres)
-  settings.py         회사/디렉터 설정 (DB→env 폴백)
-  error_log.py        logger.error → errors 테이블
-  templates/          Jinja2 화면
-scripts/
-  init_db.py          스키마 1회 생성
-  seed_ai_context.py  사례+스타일가이드 DB 적재
-  notion_import.py    노션 243건 적재 (--apply / --backfill)
-ai_context/           시드용 reply_examples.json, antiegg_style_guide.md
-vercel.json           빌드 + 라우트 + cron
-```
+- **자동 수신**: 홈페이지 문의 폼 → Notion → 어드민에 딜 자동 생성
+- **AI 회신 초안**: Claude가 문의를 요약하고 회신 초안을 작성 (사람이 검토 후 발송)
+- **문서 생성**: 딜 조건으로 견적서·계약서를 즉시 생성 (PDF)
+- **현황 대시보드**: 성사율·계약액·문의 추이를 팀이 한눈에
 
-## 로컬 개발
+> 기존에는 운영자 PC에서 상시 가동(로컬 LLM + 스케줄러)되던 것을, **서버리스 클라우드로 전면
+> 재구축**해 어디서든 접속 가능하고 자동으로 굴러가게 만들었다.
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-cp .env.example .env        # 값 채우기 (아래)
-.venv/bin/python scripts/init_db.py          # 스키마 생성 (1회)
-.venv/bin/python scripts/seed_ai_context.py  # 사례/스타일가이드 적재 (1회)
-.venv/bin/python scripts/notion_import.py            # 진단(읽기전용)
-.venv/bin/python scripts/notion_import.py --apply    # 노션 243건 적재 (기존 deals wipe!)
-.venv/bin/uvicorn app.main:app --reload      # http://localhost:8000
-```
+## 주요 기능
 
-## 환경변수 (.env / Vercel 프로젝트 env)
-
-| 키 | 용도 |
+| 영역 | 기능 |
 |---|---|
-| `DATABASE_URL` | **Supabase transaction pooler(:6543)** 연결문자열. 서버리스 필수 |
-| `ANTHROPIC_API_KEY` | Claude API 키 (console.anthropic.com) |
-| `ANTHROPIC_MODEL` | 기본 `claude-opus-4-8` |
-| `GMAIL_ADDRESS` / `GMAIL_APP_PASSWORD` | Gmail 앱 비밀번호 |
-| `B2B_LABEL` | 수신 라벨 (기본 `B2B_INQUIRY`) |
-| `ADMIN_USER` / `ADMIN_PASSWORD` | 어드민 Basic Auth. 미설정 시 인증 비활성 |
-| `CRON_SECRET` | Vercel Cron 보호. `/cron/daily`는 `Authorization: Bearer <CRON_SECRET>` 검증 |
-| `APP_BASE_URL` | 공개 주소 |
-| `ANTIEGG_*` / `DIRECTOR_*` | 회사/디렉터 정보 (settings 폴백) |
-| `NOTION_TOKEN` / `NOTION_DB_ID` | 노션 동기화(런타임 자동수신) + 임포트 스크립트. **Vercel env 필수** |
+| 📥 **자동 수신** | 폼 → Notion → 증분 동기화로 신규 문의 딜 생성 (일 1회 자동 + 수동 버튼) |
+| 🤖 **AI 회신** | Claude Opus 4.8로 문의 파싱 + 회신 초안 자동 작성 |
+| 📊 **대시보드** | 전체 딜·성사율·계약액 합계·월별 문의 추이·단계별 분포 |
+| 🗂 **딜 관리** | 인박스·파이프라인(칸반)·회사별 보기·통합 검색(⌘K)·딜 CRUD |
+| 📄 **문서 생성** | 견적서·계약서 HTML 미리보기 → 브라우저 인쇄로 PDF |
+| ✉️ **회신 발송** | 회신 초안을 Gmail 임시보관함에 저장 (발송은 사람이) |
+| ♻️ **운영 자동화** | 매일 DB 백업(Gmail 발송) + 에러 알림(실패 시 통지) |
+| 🔐 **접근 제어** | 어드민 전 구간 HTTP Basic Auth |
 
-> Supabase 연결: 서버리스는 직접연결(:5432, 현재 IPv6 전용)이 아닌 **pooler(:6543)** 를 써야 한다.
-> Supabase 대시보드 → Project Settings → Database → Connection string → **Transaction pooler**.
+## 기술 스택
 
-## 배포 (Vercel)
+| 구분 | 사용 |
+|---|---|
+| **호스팅** | Vercel (서버리스, Python) + Vercel Cron |
+| **백엔드** | FastAPI · Jinja2 · HTMX |
+| **DB** | Supabase Postgres (transaction pooler) |
+| **AI** | Anthropic Claude Opus 4.8 (`anthropic` SDK) |
+| **연동** | Notion API (문의 동기화) · Gmail IMAP/SMTP (초안·백업·알림) |
+| **CI/CD** | GitHub → Vercel 자동 배포 |
 
-```bash
-npm i -g vercel          # 최초 1회
-vercel login
-vercel link              # 새 프로젝트 생성/연결
-# Vercel 대시보드 또는 `vercel env add` 로 위 환경변수 설정
-vercel --prod
+## 시스템 구조
+
+```
+   홈페이지 문의 폼
+        │ (자동)
+        ▼
+     Notion DB ──────────┐
+                         │ 증분 동기화 (Cron 일1회 / 수동)
+                         ▼
+ ┌───────────────────────────────────────────┐
+ │   Vercel 서버리스  (FastAPI + Jinja/HTMX)   │
+ │   · Basic Auth   · 대시보드/딜/문서 라우트   │
+ └───────┬───────────────────┬────────────────┘
+         │                   │
+         ▼                   ▼
+ Supabase Postgres      Claude Opus 4.8
+  (딜·활동·설정·사례)     (파싱 · 회신 초안)
+         │
+         ▼ 매일
+   DB 백업(JSON) → Gmail   ·   에러 알림 → Gmail
 ```
 
-> **자동 배포**: GitHub 레포(`ruruzene-del/antiegg-b2b-cloud`)가 Vercel에 연결돼 있어
-> `git push origin main` 하면 프로덕션이 자동 배포된다 (`vercel git connect` 완료).
+**운영 흐름**: 폼 문의 → Notion 적재 → 동기화로 딜 생성 + AI 회신 초안 → 사람이 검토·수정 →
+Gmail에서 발송 → 어드민에서 단계 변경.
 
-`vercel.json`의 cron이 매일 00:00(UTC, 09:00 KST)에 `/cron/daily`를 호출해 Notion 신규 문의를 동기화한다.
-Vercel은 cron 요청에 `Authorization: Bearer $CRON_SECRET` 헤더를 붙인다.
+## 배포 링크
 
-## 운영 흐름
+- **어드민**: https://antiegg-b2b-cloud.vercel.app _(내부 인증 필요)_
+- **자동 배포**: `main` 브랜치 push 시 Vercel이 프로덕션 자동 배포
 
-1. 홈페이지 폼 문의 → Notion DB에 자동 적재 → (일1회 cron 또는 세팅 "지금 동기화") → 신규 행을 딜로 + Claude 회신 초안 자동 생성 → 인박스에 추가
-2. 인박스에서 딜 열기 → 회신 초안 검토/수정 (필요시 "AI 재생성") → **"Gmail 초안으로 저장"**
-3. Gmail 임시보관함에서 사람이 확인 후 직접 발송 → 어드민에서 Stage 수동 변경
+## 향후 개발 로드맵
 
-## MVP 범위 / v2
+**1순위 — 상용화 기반**
+- [x] DB 자동 백업 (오프사이트)
+- [ ] Vercel Pro / Supabase 유료 전환 (상업용 약관·안정성)
+- [ ] 접근 권한 분리 (단일 비밀번호 → 계정/권한)
+- [ ] 개인정보 처리 정책
 
-**MVP (현재):** 인박스·파이프라인·회사·세팅, 딜 CRUD, AI 회신 생성, Gmail 초안 저장, 일1회 폴링, Basic Auth, few-shot 사례 관리.
+**2순위 — 운영 안정성**
+- [x] 에러/실패 알림
+- [ ] 회신 발송 계정 정합 (editor@antiegg.kr)
+- [ ] 자동 동기화 주기 단축 (실시간화)
 
-**v2 (예정):** 견적/계약 docx 생성·다운로드, 고객 전자서명(`/sign`), 노크 자동화(무응답 7일), 보낸메일 few-shot 자동학습, Slack 알림.
+**3순위 — 기능 확장**
+- [ ] AI 회신 자동 생성 활성화 (API 키 연결)
+- [ ] 무응답 후속(노크) 자동화
+- [ ] 고객 전자서명
+- [ ] 견적/계약 DOCX 다운로드
+- [ ] 보낸메일 학습(AI 품질↑) · Slack 알림
+
+---
+
+<sub>자세한 현황·운영 정보는 [`docs/STATUS.md`](docs/STATUS.md) 참고.</sub>
