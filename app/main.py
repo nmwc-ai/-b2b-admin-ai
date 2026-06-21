@@ -13,11 +13,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
-from app import db, ai, settings, inbox, email_client, notion_sync, backup, alerts, knock
+from app import db, ai, settings, inbox, email_client, notion_sync, backup, alerts, knock, document
 from app import examples as ex_svc
 from app.error_log import install_db_handler
 
@@ -767,6 +767,29 @@ async def preview_quote(request: Request, deal_id: str):
         'quote_date': today.strftime('%Y년 %m월 %d일'),
         'valid_until': (today + timedelta(days=30)).strftime('%Y년 %m월 %d일'),
     })
+
+
+_DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+
+@app.get('/download/quote/{deal_id}')
+async def download_quote(deal_id: str):
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return HTMLResponse('딜을 찾을 수 없습니다', status_code=404)
+    data = document.generate_quote(deal)
+    return Response(content=data, media_type=_DOCX_MIME,
+                    headers={'Content-Disposition': f'attachment; filename="{deal_id}_quote.docx"'})
+
+
+@app.get('/download/contract/{deal_id}')
+async def download_contract(deal_id: str):
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return HTMLResponse('딜을 찾을 수 없습니다', status_code=404)
+    data = document.generate_contract(deal)
+    return Response(content=data, media_type=_DOCX_MIME,
+                    headers={'Content-Disposition': f'attachment; filename="{deal_id}_contract.docx"'})
 
 
 @app.get('/preview/contract/{deal_id}', response_class=HTMLResponse)

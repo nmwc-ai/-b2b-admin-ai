@@ -262,7 +262,15 @@
             <i data-lucide="file-signature" style="width:14px;height:14px;"></i> 계약서 미리보기
           </a>
         </div>
-        <div class="text-meta" style="margin-top: var(--sp-1);">위 조건을 저장한 뒤 미리보기 → 브라우저 ⌘P로 PDF 저장</div>
+        <div class="flex gap-2" style="flex-wrap: wrap; margin-top: var(--sp-2);">
+          <a href="/download/quote/{{ deal.deal_id }}" class="btn btn-ghost" style="height:30px; font-size:12px;">
+            <i data-lucide="download" style="width:13px;height:13px;"></i> 견적서 .docx
+          </a>
+          <a href="/download/contract/{{ deal.deal_id }}" class="btn btn-ghost" style="height:30px; font-size:12px;">
+            <i data-lucide="download" style="width:13px;height:13px;"></i> 계약서 .docx
+          </a>
+        </div>
+        <div class="text-meta" style="margin-top: var(--sp-1);">미리보기 → ⌘P로 PDF, 또는 .docx로 다운로드</div>
 
         <div style="margin-top: var(--sp-4);">
           <div class="micro" style="margin-bottom: var(--sp-2); text-transform: uppercase; letter-spacing: .04em;">전자서명</div>
