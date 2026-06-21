@@ -15,7 +15,7 @@ import urllib.request
 
 from app import db
 
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
 ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-opus-4-8')
 
 
@@ -34,7 +34,12 @@ def _gemini(system: str, user: str, max_tokens: int, json_mode: bool) -> str:
            f'{GEMINI_MODEL}:generateContent?key={key}')
     body = {
         'contents': [{'parts': [{'text': user}]}],
-        'generationConfig': {'maxOutputTokens': max_tokens, 'temperature': 0.7},
+        'generationConfig': {
+            'maxOutputTokens': max_tokens,
+            'temperature': 0.7,
+            # 2.5 계열은 thinking 모델 — thinking 비활성화해 토큰을 본문에 쓰고 빈 응답 방지
+            'thinkingConfig': {'thinkingBudget': 0},
+        },
     }
     if system:
         body['systemInstruction'] = {'parts': [{'text': system}]}
@@ -44,7 +49,12 @@ def _gemini(system: str, user: str, max_tokens: int, json_mode: bool) -> str:
                                  headers={'Content-Type': 'application/json'}, method='POST')
     with urllib.request.urlopen(req, timeout=60) as r:
         data = json.load(r)
-    return data['candidates'][0]['content']['parts'][0]['text'].strip()
+    cand = (data.get('candidates') or [{}])[0]
+    parts = (cand.get('content') or {}).get('parts') or []
+    text = ''.join(p.get('text', '') for p in parts).strip()
+    if not text:
+        raise RuntimeError(f"빈 응답 (finishReason={cand.get('finishReason', '?')})")
+    return text
 
 
 # ── Claude (폴백) ─────────────────────────────────────────────────────────────
