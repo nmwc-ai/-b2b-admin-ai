@@ -69,6 +69,24 @@
 
 <div class="settings-group">
   <div class="card">
+    <div class="h-section mb-4">사례 학습 (보낸메일)</div>
+    <div class="text-meta mb-4">
+      editor@antiegg.kr로 보낸 B2B 1차 회신을 AI가 분류해 회신 초안용 사례(few-shot)로 학습합니다.
+      사례가 쌓일수록 AI 회신 초안의 말투·구조가 실제 회신에 가까워집니다. 매일 1회 자동으로 새 회신만 가져옵니다.
+      지금 바로 학습하려면 아래 버튼을 누르세요.
+    </div>
+    <div style="display: flex; justify-content: flex-end;">
+      <button type="button" class="btn btn-secondary"
+              hx-post="/admin/ingest-sent" hx-swap="none">
+        <i data-lucide="graduation-cap" style="width:14px; height:14px;"></i>
+        <span>사례 학습</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="settings-group">
+  <div class="card">
     <div class="h-section mb-4">노크 (무응답 후속)</div>
     <div class="text-meta mb-4">
       회신·견적 후 7일 무응답이면 노크 단계로 전환하고 AI 노크 초안을 만듭니다.

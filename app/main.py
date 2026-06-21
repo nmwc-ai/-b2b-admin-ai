@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Resp
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
-from app import db, ai, settings, inbox, email_client, notion_sync, backup, alerts, knock, document
+from app import db, ai, settings, inbox, email_client, notion_sync, backup, alerts, knock, document, ingest
 from app import examples as ex_svc
 from app.error_log import install_db_handler
 
@@ -822,6 +822,13 @@ async def cron_daily(request: Request):
     except Exception as e:
         kn = {'error': str(e)}
         logging.error(f'[cron/daily] knock 실패: {e}')
+    # 보낸메일 학습 — 새 editor 회신을 분류해 few-shot 사례로 적재 (증분)
+    try:
+        ig = ingest.ingest_sent_examples()
+        logging.info(f'[cron/daily] ingest {ig}')
+    except Exception as e:
+        ig = {'error': str(e)}
+        logging.error(f'[cron/daily] ingest 실패: {e}')
     # 일1회 DB 백업 (실패해도 동기화 결과는 반환)
     try:
         bk = backup.run_backup()
@@ -835,7 +842,7 @@ async def cron_daily(request: Request):
     except Exception as e:
         al = {'error': str(e)}
         logging.error(f'[cron/daily] alert 실패: {e}')
-    return JSONResponse({'ok': True, 'sync': result, 'knock': kn, 'backup': bk, 'alert': al})
+    return JSONResponse({'ok': True, 'sync': result, 'knock': kn, 'ingest': ig, 'backup': bk, 'alert': al})
 
 
 @app.post('/admin/run-knock')
@@ -859,6 +866,22 @@ async def admin_sync_notion(request: Request):
         typ = 'error'
     else:
         msg = f"신규 {result.get('new', 0)}건 중 {result.get('inserted', 0)}건 적재"
+        typ = 'success' if result.get('inserted') else 'info'
+    if request.headers.get('HX-Request'):
+        resp = HTMLResponse('', status_code=200)
+        resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': typ}})
+        return resp
+    return JSONResponse({'ok': True, **result})
+
+
+@app.post('/admin/ingest-sent')
+async def admin_ingest_sent(request: Request):
+    """'사례 학습' 버튼 — 보낸편지함의 B2B 회신을 분류해 few-shot 사례로 적재."""
+    result = ingest.ingest_sent_examples()
+    if result.get('error'):
+        msg, typ = f"학습 실패: {result['error']}", 'error'
+    else:
+        msg = f"보낸메일 {result.get('fetched', 0)}건 검토 · 신규 사례 {result.get('inserted', 0)}건 적재"
         typ = 'success' if result.get('inserted') else 'info'
     if request.headers.get('HX-Request'):
         resp = HTMLResponse('', status_code=200)
