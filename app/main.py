@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Resp
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
-from app import db, ai, settings, inbox, email_client, notion_sync, backup, alerts, knock, document, ingest
+from app import db, ai, settings, inbox, email_client, notion_sync, backup, alerts, knock, document, ingest, slack
 from app import examples as ex_svc
 from app.error_log import install_db_handler
 
@@ -403,6 +403,7 @@ async def settings_page(request: Request):
         'saved': request.query_params.get('saved') == '1',
         'brand_email': brand,
         'brand_is_fallback': brand == os.getenv('GMAIL_ADDRESS', ''),
+        'slack_enabled': slack.enabled(),
     })
 
 
@@ -875,6 +876,23 @@ async def admin_sync_notion(request: Request):
         resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': typ}})
         return resp
     return JSONResponse({'ok': True, **result})
+
+
+@app.post('/admin/test-slack')
+async def admin_test_slack(request: Request):
+    """'Slack 테스트' 버튼 — 웹훅이 살아있는지 메시지 1통으로 확인."""
+    if not slack.enabled():
+        msg, typ, ok = 'SLACK_WEBHOOK 미설정 — env에 웹훅 URL을 등록하세요', 'error', False
+    else:
+        ok = slack.post('✅ ANTIEGG B2B 어드민 — Slack 연결 테스트입니다. '
+                        '이 메시지가 보이면 신규 문의·문제 알림이 정상 전송됩니다.')
+        msg = 'Slack 테스트 메시지 전송됨 — 채널 확인' if ok else 'Slack 전송 실패 (웹훅 URL 확인)'
+        typ = 'success' if ok else 'error'
+    if request.headers.get('HX-Request'):
+        resp = HTMLResponse('', status_code=200)
+        resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': typ}})
+        return resp
+    return JSONResponse({'ok': ok, 'message': msg})
 
 
 @app.post('/admin/ingest-sent')

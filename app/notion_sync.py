@@ -12,7 +12,7 @@ import logging
 import urllib.request
 from datetime import datetime
 
-from app import db, ai
+from app import db, ai, slack
 
 logger = logging.getLogger('notion_sync')
 NOTION_VERSION = '2022-06-28'
@@ -135,6 +135,7 @@ def sync_new(dry_run: bool = False, with_ai: bool = True) -> dict:
                 'sample': [_map_row(pg)['company'] for pg in new_rows[:5]]}
 
     inserted = 0
+    inserted_companies = []
     for pg in new_rows:
         try:
             m = _map_row(pg)
@@ -162,8 +163,14 @@ def sync_new(dry_run: bool = False, with_ai: bool = True) -> dict:
             db.update_deal(deal_id, fields)
             db.log_activity(deal_id, 'inbound_received', {'source': 'notion', 'company': m['company']})
             inserted += 1
+            inserted_companies.append(m['company'])
         except Exception as e:
             logger.error(f"[notion_sync] 딜 적재 실패({pg.get('id')}): {e}")
+
+    if inserted:
+        names = ', '.join(inserted_companies[:8]) + (' 외' if inserted > 8 else '')
+        slack.post(f'🆕 *신규 B2B 문의 {inserted}건*\n{names}\n'
+                   'https://antiegg-b2b-cloud.vercel.app/')
 
     return {'total': len(rows), 'existing': len(existing), 'new': len(new_rows), 'inserted': inserted}
 

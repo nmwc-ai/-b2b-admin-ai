@@ -8,7 +8,7 @@ import os
 import logging
 from datetime import datetime, timedelta
 
-from app import db, email_client
+from app import db, email_client, slack
 
 logger = logging.getLogger('alerts')
 
@@ -22,16 +22,18 @@ def _recipient() -> str:
 
 
 def notify(subject: str, body: str) -> bool:
+    """문제 알림을 이메일 + Slack(설정 시) 양쪽으로. 한 채널이라도 성공하면 True."""
+    slack.post(f'⚠️ *[ANTIEGG B2B] {subject}*\n{body}')
     to = _recipient()
     if not to:
         logger.error('[alerts] 수신 이메일 미설정')
-        return False
+        return slack.enabled()
     try:
         email_client.send_mail(to, f'[ANTIEGG B2B ⚠️] {subject}', body)
         return True
     except Exception as e:
         logger.error(f'[alerts] 발송 실패: {e}')
-        return False
+        return slack.enabled()
 
 
 def _recent_errors(hours: int = 24) -> list:
