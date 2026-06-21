@@ -263,6 +263,23 @@
           </a>
         </div>
         <div class="text-meta" style="margin-top: var(--sp-1);">위 조건을 저장한 뒤 미리보기 → 브라우저 ⌘P로 PDF 저장</div>
+
+        <div style="margin-top: var(--sp-4);">
+          <div class="micro" style="margin-bottom: var(--sp-2); text-transform: uppercase; letter-spacing: .04em;">전자서명</div>
+          {% if sign_url %}
+            <div class="text-meta" style="margin-bottom: 4px;">
+              고객에게 보낼 서명 링크{% if deal.signed_at %} · <span style="color:#16A34A;font-weight:600;">✅ {{ deal.signed_at[:10] }} 서명 완료</span>{% endif %}
+            </div>
+            <input type="text" readonly value="{{ sign_url }}" onclick="this.select()"
+                   style="font-size:12px; background:#FAFAFA;">
+          {% else %}
+            <button type="button" class="btn btn-secondary" style="height:32px;"
+                    hx-post="/deals/{{ deal.deal_id }}/sign-link"
+                    hx-target="#panel-content" hx-swap="innerHTML">
+              <i data-lucide="pen-line" style="width:14px;height:14px;"></i> 전자서명 링크 생성
+            </button>
+          {% endif %}
+        </div>
       </div>
     </div>
   </details>

@@ -204,6 +204,7 @@ def _panel_context(deal: dict) -> dict:
         'has_draft': deal.get('trigger_reply_send') == 'DRAFT',
         'is_knock': deal.get('stage') in ('KNOCK_REPLY', 'KNOCK_QUOTE'),
         'has_knock_draft': deal.get('trigger_knock_send') == 'DRAFT',
+        'sign_url': (os.getenv('APP_BASE_URL', '').rstrip('/') + '/sign/' + deal['sign_token']) if deal.get('sign_token') else None,
         'stage_options': STAGE_OPTIONS,
         'quote_url': docs['quote_url'],
         'contract_url': docs['contract_url'],
@@ -688,6 +689,44 @@ async def update_conditions(
     })
     toast_resp = _hx_toast_only(request, {'message': '딜 조건 저장됨', 'type': 'success'})
     return toast_resp if toast_resp is not None else RedirectResponse(f'/deals/{deal_id}', status_code=303)
+
+
+# ── 전자서명 ──────────────────────────────────────────────────────────────────
+@app.post('/deals/{deal_id}/sign-link')
+async def gen_sign_link(request: Request, deal_id: str):
+    """계약 전자서명 링크 생성 (1회용 토큰)."""
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return HTMLResponse('딜을 찾을 수 없습니다', status_code=404)
+    if not deal.get('sign_token'):
+        db.set_sign_token(deal_id)
+        db.log_activity(deal_id, 'note_added', {'note': '전자서명 링크 생성'})
+    return _hx_or_redirect(request, deal_id, toast={'message': '서명 링크를 생성했습니다', 'type': 'success'})
+
+
+@app.get('/sign/{token}', response_class=HTMLResponse)
+async def sign_page(request: Request, token: str):
+    deal = db.get_deal_by_sign_token(token)
+    if not deal:
+        return HTMLResponse('유효하지 않은 서명 링크입니다.', status_code=404)
+    return templates.TemplateResponse('sign.html', {'request': request, 'deal': deal})
+
+
+@app.post('/sign/{token}', response_class=HTMLResponse)
+async def sign_submit(request: Request, token: str, signer_name: str = Form(...)):
+    deal = db.get_deal_by_sign_token(token)
+    if not deal:
+        return HTMLResponse('유효하지 않은 서명 링크입니다.', status_code=404)
+    if deal.get('signed_at'):
+        return templates.TemplateResponse('sign.html', {'request': request, 'deal': deal})
+    now = datetime.now().isoformat()
+    client_ip = request.client.host if request.client else ''
+    db.update_deal(deal['deal_id'], {'signed_at': now, 'signed_ip': client_ip, 'stage': 'SIGNED'})
+    db.log_activity(deal['deal_id'], 'signed', {'signer': signer_name, 'ip': client_ip})
+    return templates.TemplateResponse('sign.html', {
+        'request': request, 'deal': db.get_deal(deal['deal_id']),
+        'signer_name': signer_name, 'just_signed': True,
+    })
 
 
 # ── 견적서 / 계약서 미리보기 (v2) ─────────────────────────────────────────────
