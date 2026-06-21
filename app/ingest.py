@@ -18,7 +18,9 @@ SINCE_UID_KEY = 'ingest_sent_since_uid'
 
 def ingest_sent_examples(limit: int = 20) -> dict:
     """보낸메일에서 B2B 1차 회신을 분류해 사례로 적재. 증분(since_uid) 처리."""
-    since = db.settings_get(SINCE_UID_KEY)
+    # UID는 메일박스마다 독립 — 계정별로 키를 분리해 계정 전환 시 처음부터 다시 학습
+    since_key = f'{SINCE_UID_KEY}:{email_client.brand_address()}'
+    since = db.settings_get(since_key)
 
     try:
         sent = email_client.fetch_sent_emails(limit=limit, since_uid=since)
@@ -72,7 +74,7 @@ def ingest_sent_examples(limit: int = 20) -> dict:
     # 다음 실행은 이번에 본 가장 큰 UID 이후만 — 비B2B 메일 재분류 방지
     if max_uid and str(max_uid) != (since or ''):
         try:
-            db.settings_set_many({SINCE_UID_KEY: str(max_uid)})
+            db.settings_set_many({since_key: str(max_uid)})
         except Exception as e:
             logger.error(f'[ingest] since_uid 저장 실패: {e}')
 

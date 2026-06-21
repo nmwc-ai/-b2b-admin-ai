@@ -396,10 +396,13 @@ async def errors_page(request: Request):
 # ── 세팅 ──────────────────────────────────────────────────────────────────────
 @app.get('/settings', response_class=HTMLResponse)
 async def settings_page(request: Request):
+    brand = email_client.brand_address()
     return templates.TemplateResponse('settings.html', {
         'request': request,
         'groups': settings.grouped_editable(),
         'saved': request.query_params.get('saved') == '1',
+        'brand_email': brand,
+        'brand_is_fallback': brand == os.getenv('GMAIL_ADDRESS', ''),
     })
 
 

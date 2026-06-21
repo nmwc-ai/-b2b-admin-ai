@@ -69,11 +69,17 @@
 
 <div class="settings-group">
   <div class="card">
-    <div class="h-section mb-4">사례 학습 (보낸메일)</div>
+    <div class="h-section mb-4">회신 계정 · 사례 학습</div>
     <div class="text-meta mb-4">
-      editor@antiegg.kr로 보낸 B2B 1차 회신을 AI가 분류해 회신 초안용 사례(few-shot)로 학습합니다.
-      사례가 쌓일수록 AI 회신 초안의 말투·구조가 실제 회신에 가까워집니다. 매일 1회 자동으로 새 회신만 가져옵니다.
-      지금 바로 학습하려면 아래 버튼을 누르세요.
+      회신·노크 초안은 <strong>{{ brand_email }}</strong> 임시보관함에 저장되고, 같은 계정의 보낸 B2B 회신을
+      AI가 분류해 회신 초안용 사례(few-shot)로 학습합니다. 사례가 쌓일수록 초안 말투·구조가 실제 회신에 가까워집니다.
+      매일 1회 자동으로 새 회신만 가져옵니다. 지금 바로 학습하려면 아래 버튼을 누르세요.
+      {% if brand_is_fallback %}
+      <div style="margin-top: var(--sp-2); color: var(--c-amber, #b45309);">
+        ⚠ 아직 브랜드 계정이 분리되지 않아 운영 계정({{ brand_email }})을 쓰고 있습니다.
+        실제 발송 계정으로 정합하려면 <code>BRAND_GMAIL_ADDRESS</code>·<code>BRAND_GMAIL_APP_PASSWORD</code>를 설정하세요.
+      </div>
+      {% endif %}
     </div>
     <div style="display: flex; justify-content: flex-end;">
       <button type="button" class="btn btn-secondary"

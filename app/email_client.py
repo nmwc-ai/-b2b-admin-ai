@@ -22,12 +22,33 @@ load_dotenv()
 
 
 def _creds() -> tuple:
+    """운영 계정 — 시스템 메일(백업 스냅샷·에러 알림)용. GMAIL_*."""
     load_dotenv(override=True)
     return (
         os.getenv('GMAIL_ADDRESS', ''),
         os.getenv('GMAIL_APP_PASSWORD', ''),
         os.getenv('B2B_LABEL', 'B2B_INQUIRY'),
     )
+
+
+def _brand_creds() -> tuple:
+    """브랜드 계정 — 고객 대면(회신·노크 초안 저장, 보낸메일 학습)용.
+
+    BRAND_GMAIL_*(editor@antiegg.kr)를 우선 쓰고, 미설정 시 운영 계정(GMAIL_*)로 폴백.
+    이렇게 초안 From·보낸함이 실제 발송 계정과 일치한다(정합).
+    """
+    load_dotenv(override=True)
+    addr = os.getenv('BRAND_GMAIL_ADDRESS', '').strip()
+    pwd = os.getenv('BRAND_GMAIL_APP_PASSWORD', '').strip()
+    # 주소·비번이 둘 다 있을 때만 브랜드 계정 사용 — 절반만 설정된 불일치 방지
+    if addr and pwd:
+        return (addr, pwd)
+    return (os.getenv('GMAIL_ADDRESS', ''), os.getenv('GMAIL_APP_PASSWORD', ''))
+
+
+def brand_address() -> str:
+    """현재 브랜드 계정 주소 (학습 증분 키 등에 사용)."""
+    return _brand_creds()[0]
 
 
 def _decode_header_str(value: str) -> str:
@@ -151,7 +172,7 @@ def _clean_reply_body(body: str) -> str:
 
 def fetch_sent_emails(limit: int = 30, since_uid: str = None) -> list:
     """보낸편지함에서 ANTIEGG 브랜드 회신만 정제해 반환 (v2 학습용)."""
-    addr, pwd, _ = _creds()
+    addr, pwd = _brand_creds()
     if not addr or not pwd:
         print('[IMAP] GMAIL 자격증명 미설정 — 스킵')
         return []
@@ -240,8 +261,8 @@ def send_with_attachment(to: str, subject: str, body: str, filename: str, data: 
 
 
 def create_draft(to: str, subject: str, body: str) -> None:
-    """Gmail 임시보관함에 초안 저장. 발송하지 않음."""
-    addr, pwd, _ = _creds()
+    """Gmail 임시보관함에 초안 저장(브랜드 계정). 발송하지 않음."""
+    addr, pwd = _brand_creds()
     if not addr or not pwd:
         raise RuntimeError('GMAIL 자격증명 미설정')
 
