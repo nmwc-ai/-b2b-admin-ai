@@ -69,6 +69,23 @@
 
 <div class="settings-group">
   <div class="card">
+    <div class="h-section mb-4">노크 (무응답 후속)</div>
+    <div class="text-meta mb-4">
+      회신·견적 후 7일 무응답이면 노크 단계로 전환하고 AI 노크 초안을 만듭니다.
+      노크 후 추가 7일 무응답이면 자동 종료(CLOSED_LOST)됩니다. 매일 1회 자동 점검됩니다.
+    </div>
+    <div style="display: flex; justify-content: flex-end;">
+      <button type="button" class="btn btn-secondary"
+              hx-post="/admin/run-knock" hx-swap="none">
+        <i data-lucide="bell-ring" style="width:14px; height:14px;"></i>
+        <span>노크 점검 실행</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="settings-group">
+  <div class="card">
     <div class="h-section mb-4">백업</div>
     <div class="text-meta mb-4">
       매일 1회 DB 전체를 JSON 스냅샷으로 떠서 운영자 Gmail로 자동 발송합니다(오프사이트 백업).

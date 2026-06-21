@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
-from app import db, ai, settings, inbox, email_client, notion_sync, backup, alerts
+from app import db, ai, settings, inbox, email_client, notion_sync, backup, alerts, knock
 from app import examples as ex_svc
 from app.error_log import install_db_handler
 
@@ -202,6 +202,8 @@ def _panel_context(deal: dict) -> dict:
         'history': db.get_deals_by_company(company, exclude_deal_id=deal['deal_id']),
         'activities': db.get_activities(deal['deal_id']),
         'has_draft': deal.get('trigger_reply_send') == 'DRAFT',
+        'is_knock': deal.get('stage') in ('KNOCK_REPLY', 'KNOCK_QUOTE'),
+        'has_knock_draft': deal.get('trigger_knock_send') == 'DRAFT',
         'stage_options': STAGE_OPTIONS,
         'quote_url': docs['quote_url'],
         'contract_url': docs['contract_url'],
@@ -608,6 +610,57 @@ async def reply_send(request: Request, deal_id: str):
     return _hx_or_redirect(request, deal_id, toast=toast)
 
 
+@app.post('/deals/{deal_id}/knock-draft')
+async def update_knock_draft(request: Request, deal_id: str, knock_draft: str = Form('')):
+    db.update_deal(deal_id, {'knock_draft': knock_draft})
+    toast_resp = _hx_toast_only(request, {'message': '노크 초안 저장됨', 'type': 'success'})
+    return toast_resp if toast_resp is not None else RedirectResponse(f'/deals/{deal_id}', status_code=303)
+
+
+@app.post('/deals/{deal_id}/regenerate-knock')
+async def regenerate_knock(request: Request, deal_id: str):
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return HTMLResponse('딜을 찾을 수 없습니다', status_code=404)
+    try:
+        draft = ai.generate_knock_draft(
+            deal.get('company') or '', deal.get('contact_name') or '',
+            deal.get('stage') or 'KNOCK_REPLY')
+        db.update_deal(deal_id, {'knock_draft': draft})
+        db.log_activity(deal_id, 'note_added', {'note': 'AI 노크 재생성'})
+        toast = {'message': 'AI 노크 초안을 생성했습니다', 'type': 'success'}
+    except Exception as e:
+        logging.error(f'[regenerate-knock] {deal_id}: {e}')
+        toast = {'message': f'AI 노크 생성 실패: {e}', 'type': 'error'}
+    return _hx_or_redirect(request, deal_id, toast=toast)
+
+
+@app.post('/deals/{deal_id}/knock-send')
+async def knock_send(request: Request, deal_id: str):
+    """노크 초안을 Gmail 임시보관함에 저장."""
+    deal = db.get_deal(deal_id)
+    if not deal:
+        return HTMLResponse('딜을 찾을 수 없습니다', status_code=404)
+    body = (deal.get('knock_draft') or '').strip()
+    to = (deal.get('email') or '').strip()
+    if not body:
+        return _hx_or_redirect(request, deal_id, toast={'message': '노크 초안이 비어있습니다', 'type': 'error'})
+    if not to or to == '미상':
+        return _hx_or_redirect(request, deal_id, toast={'message': '수신 이메일이 없습니다', 'type': 'error'})
+    subject = f"[ANTIEGG] {deal.get('company') or ''} 후속 안내".strip()
+    old = deal.get('trigger_knock_send') or 'IDLE'
+    try:
+        email_client.create_draft(to, subject, body)
+        db.update_deal(deal_id, {'trigger_knock_send': 'DRAFT'})
+        db.log_activity(deal_id, 'trigger_fired', {'trigger': 'knock_send', 'from': old, 'to': 'DRAFT'})
+        toast = {'message': 'Gmail 임시보관함에 노크 초안을 저장했습니다', 'type': 'success'}
+    except Exception as e:
+        logging.error(f'[knock-send] {deal_id}: {e}')
+        db.update_deal(deal_id, {'trigger_knock_send': 'ERROR'})
+        toast = {'message': f'Gmail 저장 실패: {e}', 'type': 'error'}
+    return _hx_or_redirect(request, deal_id, toast=toast)
+
+
 @app.post('/deals/{deal_id}/conditions')
 async def update_conditions(
     request: Request,
@@ -700,6 +753,13 @@ async def cron_daily(request: Request):
             return JSONResponse({'error': 'unauthorized'}, status_code=401)
     result = notion_sync.sync_new()
     logging.info(f'[cron/daily] notion_sync {result}')
+    # 노크 점검 (무응답 7일 → 노크 / 추가 7일 → 종료)
+    try:
+        kn = knock.run_knock_checks()
+        logging.info(f'[cron/daily] knock {kn}')
+    except Exception as e:
+        kn = {'error': str(e)}
+        logging.error(f'[cron/daily] knock 실패: {e}')
     # 일1회 DB 백업 (실패해도 동기화 결과는 반환)
     try:
         bk = backup.run_backup()
@@ -713,7 +773,19 @@ async def cron_daily(request: Request):
     except Exception as e:
         al = {'error': str(e)}
         logging.error(f'[cron/daily] alert 실패: {e}')
-    return JSONResponse({'ok': True, 'sync': result, 'backup': bk, 'alert': al})
+    return JSONResponse({'ok': True, 'sync': result, 'knock': kn, 'backup': bk, 'alert': al})
+
+
+@app.post('/admin/run-knock')
+async def admin_run_knock(request: Request):
+    """'노크 점검 실행' 버튼 — 무응답 딜 노크 전환/종료 처리."""
+    result = knock.run_knock_checks()
+    msg = f"노크 전환 {result.get('knocked', 0)}건 · 자동 종료 {result.get('closed_lost', 0)}건"
+    if request.headers.get('HX-Request'):
+        resp = HTMLResponse('', status_code=200)
+        resp.headers['HX-Trigger'] = json.dumps({'toast': {'message': msg, 'type': 'info'}})
+        return resp
+    return JSONResponse({'ok': True, **result})
 
 
 @app.post('/admin/sync-notion')

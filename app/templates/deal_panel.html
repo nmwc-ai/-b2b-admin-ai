@@ -143,6 +143,43 @@
     </form>
   </div>
 
+  {# ── 노크 메일 (노크 단계일 때만) ── #}
+  {% if is_knock %}
+  <div style="margin-top: var(--sp-5);">
+    {% if has_knock_draft %}
+    <div class="draft-alert" style="margin-bottom: var(--sp-3);">
+      <span class="dot"></span>
+      <div>노크 초안이 Gmail 임시보관에 저장되었습니다. 검토 후 발송해주세요.</div>
+      <a href="https://mail.google.com/mail/u/0/#drafts" target="_blank">Gmail 열기 →</a>
+    </div>
+    {% endif %}
+    <div class="section-head" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>노크 메일 <span class="text-muted" style="font-weight:400;">(무응답 후속)</span></span>
+      <button type="button" class="btn btn-ghost" style="height:28px; font-size:12px;"
+              hx-post="/deals/{{ deal.deal_id }}/regenerate-knock"
+              hx-target="#panel-content" hx-swap="innerHTML"
+              hx-confirm="{% if deal.knock_draft %}현재 노크 초안을 AI가 새로 작성한 내용으로 덮어쓸까요?{% endif %}">
+        <i data-lucide="sparkles" style="width:13px;height:13px;"></i> AI 재생성
+      </button>
+    </div>
+    <form method="post" action="/deals/{{ deal.deal_id }}/knock-draft"
+          hx-post="/deals/{{ deal.deal_id }}/knock-draft" hx-swap="none">
+      <textarea name="knock_draft" placeholder="(비어있음 — 'AI 재생성'으로 노크 초안 생성)"
+                style="min-height: 120px;">{{ deal.knock_draft or '' }}</textarea>
+      <div class="flex gap-2" style="margin-top: var(--sp-2);">
+        <button type="submit" class="btn btn-secondary">초안 저장</button>
+        <button type="button" class="btn btn-primary"
+                hx-post="/deals/{{ deal.deal_id }}/knock-send"
+                hx-target="#panel-content" hx-swap="innerHTML"
+                {% if not deal.email or deal.email == '미상' %}disabled title="수신 이메일이 없습니다"{% endif %}>
+          <i data-lucide="send" style="width:15px;height:15px;"></i>
+          Gmail 초안으로 저장
+        </button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
   {# ── 딜 조건 (접힘, v2 견적/계약 대비 입력만) ── #}
   <details class="collapsible" style="margin-top: var(--sp-4);">
     <summary>딜 조건</summary>
