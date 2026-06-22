@@ -4,6 +4,7 @@
 > 원칙은 _"판단은 사람, 실행은 AI"_ — 메일 발송은 항상 사람이 확인하고 누른다.
 
 🔗 **배포**: https://antiegg-b2b-cloud.vercel.app _(어드민 접근은 내부 인증 필요)_
+📦 **저장소**: https://github.com/nmwc-ai/-b2b-admin-ai
 
 ---
 
