@@ -156,7 +156,8 @@
       신규 B2B 문의가 들어오거나(동기화 시) 동기화·백업 실패·에러가 생기면 Slack 채널로 알립니다.
       {% if not slack_enabled %}
       <div style="margin-top: var(--sp-2); color: var(--c-amber, #b45309);">
-        ⚠ 아직 미설정입니다. Slack Incoming Webhook URL을 <code>SLACK_WEBHOOK</code> 환경변수에 등록하면 켜집니다.
+        ⚠ 아직 미설정입니다. 기존 봇 토큰(<code>SLACK_BOT_TOKEN</code>+<code>SLACK_CHANNEL</code>)
+        또는 웹훅(<code>SLACK_WEBHOOK</code>)을 환경변수에 등록하면 켜집니다.
       </div>
       {% endif %}
     </div>
